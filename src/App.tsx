@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Compass, Loader2, Building, Globe2, MapPinned } from 'lucide-react';
+import { MapPin, Loader2, Globe2 } from 'lucide-react';
 
 interface LocationState {
   latitude: number | null;
@@ -21,8 +21,9 @@ function App() {
     address: null,
     placeName: null,
     error: null,
-    loading: true,
+    loading: false,
   });
+
   const [allLocations, setAllLocations] = useState<LocationState[]>([]);
 
   // Função para salvar a localização no LocalStorage
@@ -57,7 +58,10 @@ function App() {
     }
   };
 
-  useEffect(() => {
+  // Função para lidar com a detecção da localização
+  const detectLocation = () => {
+    setLocation((prev) => ({ ...prev, loading: true }));
+
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
@@ -78,9 +82,7 @@ function App() {
           };
 
           setLocation(newLocation);
-
-          // Salvar a localização no LocalStorage
-          saveLocationToLocalStorage(newLocation);
+          saveLocationToLocalStorage(newLocation); // Salva a localização no LocalStorage
         },
         (error) => {
           setLocation({
@@ -107,12 +109,15 @@ function App() {
         loading: false,
       });
     }
+  };
 
-    // Buscar localizações salvas do LocalStorage
-    fetchAllLocationsFromLocalStorage();
+  // Detectar localização na montagem do componente
+  useEffect(() => {
+    fetchAllLocationsFromLocalStorage(); // Buscar localizações salvas no LocalStorage
+    detectLocation(); // Detecta a localização quando o componente é montado
   }, []);
 
-  // Função para limpar as localizações no LocalStorage
+  // Função para limpar as localizações
   const clearLocation = () => {
     setLocation({
       latitude: null,
@@ -122,10 +127,14 @@ function App() {
       address: null,
       placeName: null,
       error: null,
-      loading: true,
+      loading: true, // Inicia o processo de detecção quando o usuário clica no "limpar"
     });
-    localStorage.removeItem('locations'); // Limpar localizações salvas
-    setAllLocations([]); // Limpar também as localizações no estado
+
+    setAllLocations([]); // Limpa as localizações salvas
+    localStorage.removeItem('locations'); // Limpa o LocalStorage
+
+    // Tenta detectar a localização novamente após limpar
+    setTimeout(detectLocation, 1000); // Um pequeno delay para evitar problemas de UI
   };
 
   return (
@@ -151,7 +160,21 @@ function App() {
             </div>
           ) : (
             <>
-              {/* Exibe informações de localização aqui... */}
+              <div className="space-y-4">
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <Globe2 className="w-5 h-5 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-500">País</p>
+                      <p className="font-medium text-gray-800">
+                        {location.country || 'Carregando...'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Exibe outras informações da localização... */}
+              </div>
 
               <h2 className="text-xl text-gray-800 mt-8">Outras Localizações:</h2>
               {allLocations.length > 0 ? (
