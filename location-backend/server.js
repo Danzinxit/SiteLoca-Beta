@@ -1,3 +1,4 @@
+// Backend - server.js
 const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
@@ -15,10 +16,6 @@ let locationData = [];
 // Endpoint para salvar localização
 app.post("/save-location", (req, res) => {
   const { latitude, longitude, country, city, address, placeName } = req.body;
-
-  if (!latitude || !longitude || !country || !city || !address) {
-    return res.status(400).json({ message: "Todos os campos são obrigatórios" });
-  }
 
   // Salva os dados de localização
   locationData.push({

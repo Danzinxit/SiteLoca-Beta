@@ -13,6 +13,16 @@ interface LocationState {
   loading: boolean;
 }
 
+interface LocationFromDB {
+  latitude: number;
+  longitude: number;
+  country: string;
+  city: string;
+  address: string;
+  placeName: string;
+  timestamp: string;
+}
+
 function App() {
   const [location, setLocation] = useState<LocationState>({
     latitude: null,
@@ -25,16 +35,16 @@ function App() {
     loading: false,
   });
 
-  const [allLocations, setAllLocations] = useState<LocationState[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showLogin, setShowLogin] = useState<boolean>(false); // Controla a exibição do formulário de login
+  const [locations, setLocations] = useState<LocationFromDB[]>([]);
 
   // Função para salvar a localização no banco de dados
   const saveLocationToDatabase = async (locationData: LocationState) => {
     try {
-      const response = await axios.post('http://localhost:5000/save-location', {
+      const response = await axios.post('https://site-loca-beta.vercel.app/save-location', {
         latitude: locationData.latitude,
         longitude: locationData.longitude,
         country: locationData.country,
@@ -91,7 +101,7 @@ function App() {
           };
 
           setLocation(newLocation);
-          saveLocationToDatabase(newLocation); // Salva a localização no banco de dados
+          saveLocationToDatabase(newLocation); // Salva a localização no backend
         },
         (error) => {
           setLocation({
@@ -120,152 +130,177 @@ function App() {
     }
   };
 
-  // Detectar localização na montagem do componente
-  useEffect(() => {
-    if (isLoggedIn) {
-      detectLocation(); // Detecta a localização quando o componente é montado
-    }
-  }, [isLoggedIn]);
-
-  // Função de login com usuário e senha (usando admin fixo)
-  const handleLogin = () => {
-    // Usuário e senha fixos para exemplo
-    if (username === 'admin' && password === 'senha123') {
-      setIsLoggedIn(true);
-      setLoginError('');
-    } else {
-      setLoginError('Usuário ou senha inválidos');
+  // Função para obter todas as localizações salvas
+  const fetchLocationsFromDatabase = async () => {
+    try {
+      const response = await axios.get('https://site-loca-beta.vercel.app/locations');
+      setLocations(response.data);
+    } catch (error) {
+      console.error('Erro ao buscar localizações salvas:', error);
     }
   };
 
-  // Se o usuário não estiver logado, exibe a tela de login
-  if (!isLoggedIn) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
-          <h2 className="text-xl font-bold text-center text-gray-800 mb-6">Login</h2>
-          <div className="flex flex-col space-y-4">
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                Usuário
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
+  useEffect(() => {
+    detectLocation(); // Detecta a localização sempre que o componente for montado
+    if (isAdmin) {
+      fetchLocationsFromDatabase(); // Se for admin, busca as localizações salvas no banco
+    }
+  }, [isAdmin]);
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Senha
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              />
-            </div>
-
-            {loginError && (
-              <p className="text-sm text-red-600 mt-2 text-center">{loginError}</p>
-            )}
-
-            <button
-              onClick={handleLogin}
-              className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 focus:outline-none"
-            >
-              Entrar
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Função de login do admin
+  const handleLogin = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (username === 'admin' && password === 'senha123') {
+      setIsAdmin(true); // Definindo que o usuário é admin
+      setShowLogin(false); // Esconde o formulário de login após o login com sucesso
+    } else {
+      alert('Credenciais inválidas');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-auto">
-        <div className="flex items-center justify-center mb-6">
-          <div className="bg-indigo-100 p-3 rounded-full">
-            <MapPin className="w-8 h-8 text-indigo-600" />
+        {/* Exibe o botão de login se o usuário não estiver logado */}
+        {!isAdmin && !showLogin && (
+          <div className="absolute top-4 right-4">
+            <button
+              onClick={() => setShowLogin(true)} // Exibe o formulário de login ao clicar
+              className="text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Fazer Login
+            </button>
           </div>
-        </div>
+        )}
 
-        <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Sua Localização</h1>
-
-        <div className="space-y-6">
-          {location.loading ? (
-            <div className="flex items-center justify-center space-x-2">
-              <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-              <p className="text-gray-600">Detectando sua localização...</p>
-            </div>
-          ) : location.error ? (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-600 text-center">{location.error}</p>
-            </div>
-          ) : (
-            <>
+        {/* Formulário de Login */}
+        {showLogin && !isAdmin && (
+          <div>
+            <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Login</h1>
+            <form onSubmit={handleLogin}>
               <div className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <Globe2 className="w-5 h-5 text-indigo-600" />
-                    <div>
-                      <p className="text-sm text-gray-500">País</p>
-                      <p className="font-medium text-gray-800">
-                        {location.country || 'Carregando...'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="w-5 h-5 text-indigo-600" />
-                    <div>
-                      <p className="text-sm text-gray-500">Cidade</p>
-                      <p className="font-medium text-gray-800">
-                        {location.city || 'Carregando...'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="w-5 h-5 text-indigo-600" />
-                    <div>
-                      <p className="text-sm text-gray-500">Endereço</p>
-                      <p className="font-medium text-gray-800">
-                        {location.address || 'Carregando...'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="w-5 h-5 text-indigo-600" />
-                    <div>
-                      <p className="text-sm text-gray-500">Nome do Local</p>
-                      <p className="font-medium text-gray-800">
-                        {location.placeName || 'Carregando...'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Exibe outras informações da localização... */}
+                <input
+                  type="text"
+                  placeholder="Usuário"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+                <input
+                  type="password"
+                  placeholder="Senha"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded"
+                />
+                <button
+                  type="submit"
+                  className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Entrar
+                </button>
               </div>
+            </form>
+            <div className="mt-4 text-center">
+              <button
+                onClick={() => setShowLogin(false)} // Fecha o formulário de login sem logar
+                className="text-blue-600 hover:text-blue-800"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
 
-              <h2 className="text-xl text-gray-800 mt-8">Outras Localizações:</h2>
-              {allLocations.length > 0 ? (
-                allLocations.map((loc, index) => (
-                  <div key={index} className="bg-gray-50 rounded-lg p-4 mt-2">
+        {/* Página de localização - Acesso público */}
+        {!showLogin && !isAdmin && (
+          <>
+            <div className="flex items-center justify-center mb-6">
+              <div className="bg-indigo-100 p-3 rounded-full">
+                <MapPin className="w-8 h-8 text-indigo-600" />
+              </div>
+            </div>
+
+            <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Sua Localização</h1>
+
+            <div className="space-y-6">
+              {location.loading ? (
+                <div className="flex items-center justify-center space-x-2">
+                  <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
+                  <p className="text-gray-600">Detectando sua localização...</p>
+                </div>
+              ) : location.error ? (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-600 text-center">{location.error}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <Globe2 className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm text-gray-500">País</p>
+                          <p className="font-medium text-gray-800">
+                            {location.country || 'Carregando...'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <MapPin className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm text-gray-500">Cidade</p>
+                          <p className="font-medium text-gray-800">
+                            {location.city || 'Carregando...'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <MapPin className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm text-gray-500">Nome do Local</p>
+                          <p className="font-medium text-gray-800">
+                            {location.placeName || 'Carregando...'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-3">
+                        <MapPin className="w-5 h-5 text-indigo-600" />
+                        <div>
+                          <p className="text-sm text-gray-500">Endereço</p>
+                          <p className="font-medium text-gray-800">
+                            {location.address || 'Carregando...'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Página Admin - Após login */}
+        {isAdmin && (
+          <div>
+            <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">Administração de Localizações</h1>
+            <p>Bem-vindo ao painel de administração. Aqui você pode ver todas as localizações salvas.</p>
+
+            {/* Exibe as localizações salvas */}
+            <div className="space-y-4">
+              {locations.length > 0 ? (
+                locations.map((loc, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
                     <p>
                       <strong>{loc.city || 'Cidade não disponível'}</strong>,{' '}
                       {loc.country || 'País não disponível'}
@@ -276,24 +311,17 @@ function App() {
                       {loc.latitude ? loc.latitude.toFixed(6) : 'Latitude não disponível'}°,
                       {loc.longitude ? loc.longitude.toFixed(6) : 'Longitude não disponível'}°
                     </p>
+                    <p>
+                      <small>{new Date(loc.timestamp).toLocaleString()}</small>
+                    </p>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-600">Nenhuma localização salva encontrada.</p>
+                <p>Sem localizações salvas ainda.</p>
               )}
-            </>
-          )}
-
-          {/* Botão para limpar as informações */}
-          <div className="flex justify-center mt-6">
-            <button
-              onClick={() => setLocation({ latitude: null, longitude: null, country: null, city: null, address: null, placeName: null, error: null, loading: false })}
-              className="px-6 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 focus:outline-none"
-            >
-              Limpar
-            </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
