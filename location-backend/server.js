@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
 
 const app = express();
 const PORT = 5000;
@@ -76,3 +75,33 @@ app.delete("/locations", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+
+const saveVisitorLocation = async () => {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const details = await getLocationDetails(
+          position.coords.latitude,
+          position.coords.longitude
+        );
+
+        const visitorLocation = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          country: details?.country || null,
+          city: details?.city || null,
+          address: details?.address || null,
+          placeName: details?.placeName || null,
+          deviceInfo: navigator.userAgent, // Informações do dispositivo
+        };
+
+        await saveLocationToDatabase(visitorLocation);
+      },
+      (error) => {
+        console.error('Erro ao obter localização do visitante:', error);
+      }
+    );
+  } else {
+    console.error('Geolocalização não é suportada pelo navegador.');
+  }
+};
